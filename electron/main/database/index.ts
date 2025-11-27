@@ -15,6 +15,11 @@ import type {
   HourlyActivity,
   DailyActivity,
   MessageType,
+  RepeatAnalysis,
+  RepeatStatItem,
+  RepeatRateItem,
+  ChainLengthDistribution,
+  HotRepeatContent,
 } from '../../../src/types/chat'
 
 // 数据库存储目录
@@ -717,6 +722,239 @@ export function getMemberNameHistory(
       .all(memberId) as Array<{ name: string; startTs: number; endTs: number | null }>
 
     return rows
+  } finally {
+    db.close()
+  }
+}
+
+/**
+ * 获取复读分析数据
+ * 使用滑动窗口算法检测复读链：
+ * - 复读成立条件：至少 3 条连续的相同内容消息，且发送者不同
+ * - 排除：系统消息、空消息、图片消息
+ */
+export function getRepeatAnalysis(sessionId: string, filter?: TimeFilter): RepeatAnalysis {
+  const db = openDatabase(sessionId)
+  const emptyResult: RepeatAnalysis = {
+    originators: [],
+    initiators: [],
+    breakers: [],
+    originatorRates: [],
+    initiatorRates: [],
+    breakerRates: [],
+    chainLengthDistribution: [],
+    hotContents: [],
+    avgChainLength: 0,
+    totalRepeatChains: 0,
+  }
+
+  if (!db) {
+    return emptyResult
+  }
+
+  try {
+    const { clause, params } = buildTimeFilter(filter)
+
+    // 构建查询条件：排除系统消息、空消息、图片
+    // MessageType: TEXT = 0, IMAGE = 1, SYSTEM = 6
+    let whereClause = clause
+    if (whereClause.includes('WHERE')) {
+      whereClause +=
+        " AND m.name != '系统消息' AND msg.type = 0 AND msg.content IS NOT NULL AND TRIM(msg.content) != ''"
+    } else {
+      whereClause =
+        " WHERE m.name != '系统消息' AND msg.type = 0 AND msg.content IS NOT NULL AND TRIM(msg.content) != ''"
+    }
+
+    // 按时间顺序获取所有符合条件的消息
+    const messages = db
+      .prepare(
+        `
+        SELECT
+          msg.id,
+          msg.sender_id as senderId,
+          msg.content,
+          m.platform_id as platformId,
+          m.name
+        FROM message msg
+        JOIN member m ON msg.sender_id = m.id
+        ${whereClause}
+        ORDER BY msg.ts ASC, msg.id ASC
+      `
+      )
+      .all(...params) as Array<{
+      id: number
+      senderId: number
+      content: string
+      platformId: string
+      name: string
+    }>
+
+    // 统计计数器
+    const originatorCount = new Map<number, number>() // 原创者计数
+    const initiatorCount = new Map<number, number>() // 挑起者计数
+    const breakerCount = new Map<number, number>() // 终结者计数
+    const memberMessageCount = new Map<number, number>() // 每个成员的发言总数
+
+    // 成员信息缓存
+    const memberInfo = new Map<number, { platformId: string; name: string }>()
+
+    // 复读链长度统计
+    const chainLengthCount = new Map<number, number>() // length -> count
+
+    // 热门复读内容统计（记录最长链的原创者）
+    const contentStats = new Map<string, { count: number; maxChainLength: number; originatorId: number }>()
+
+    // 滑动窗口算法
+    let currentContent: string | null = null
+    let repeatChain: Array<{ senderId: number; content: string }> = []
+    let totalRepeatChains = 0
+    let totalChainLength = 0 // 用于计算平均长度
+
+    // 处理复读链的辅助函数（至少3人参与才算复读）
+    const processRepeatChain = (chain: Array<{ senderId: number; content: string }>, breakerId?: number) => {
+      if (chain.length < 3) return
+
+      totalRepeatChains++
+      const chainLength = chain.length
+      totalChainLength += chainLength
+
+      // 原创者
+      const originatorId = chain[0].senderId
+      originatorCount.set(originatorId, (originatorCount.get(originatorId) || 0) + 1)
+
+      // 挑起者
+      const initiatorId = chain[1].senderId
+      initiatorCount.set(initiatorId, (initiatorCount.get(initiatorId) || 0) + 1)
+
+      // 终结者
+      if (breakerId !== undefined) {
+        breakerCount.set(breakerId, (breakerCount.get(breakerId) || 0) + 1)
+      }
+
+      // 复读链长度统计
+      chainLengthCount.set(chainLength, (chainLengthCount.get(chainLength) || 0) + 1)
+
+      // 热门复读内容统计（记录最长链的原创者）
+      const content = chain[0].content
+      const existing = contentStats.get(content)
+      if (existing) {
+        existing.count++
+        // 如果当前链更长，更新最长链信息和原创者
+        if (chainLength > existing.maxChainLength) {
+          existing.maxChainLength = chainLength
+          existing.originatorId = originatorId
+        }
+      } else {
+        contentStats.set(content, { count: 1, maxChainLength: chainLength, originatorId })
+      }
+    }
+
+    for (const msg of messages) {
+      // 缓存成员信息
+      if (!memberInfo.has(msg.senderId)) {
+        memberInfo.set(msg.senderId, { platformId: msg.platformId, name: msg.name })
+      }
+
+      // 统计每个成员的发言总数
+      memberMessageCount.set(msg.senderId, (memberMessageCount.get(msg.senderId) || 0) + 1)
+
+      const content = msg.content.trim()
+
+      if (content === currentContent) {
+        // 内容相同
+        const lastSender = repeatChain[repeatChain.length - 1]?.senderId
+        if (lastSender !== msg.senderId) {
+          // 不同人发的相同内容，延续复读链
+          repeatChain.push({ senderId: msg.senderId, content })
+        }
+        // 同一人连续发相同内容，忽略（不算复读）
+      } else {
+        // 内容不同，检查是否形成了复读
+        processRepeatChain(repeatChain, msg.senderId)
+
+        // 开始新链
+        currentContent = content
+        repeatChain = [{ senderId: msg.senderId, content }]
+      }
+    }
+
+    // 处理最后一个复读链（如果存在，没有终结者）
+    processRepeatChain(repeatChain)
+
+    // 构建绝对次数排行榜
+    const buildRankList = (countMap: Map<number, number>, total: number): RepeatStatItem[] => {
+      const items: RepeatStatItem[] = []
+      for (const [memberId, count] of countMap.entries()) {
+        const info = memberInfo.get(memberId)
+        if (info) {
+          items.push({
+            memberId,
+            platformId: info.platformId,
+            name: info.name,
+            count,
+            percentage: total > 0 ? Math.round((count / total) * 10000) / 100 : 0,
+          })
+        }
+      }
+      return items.sort((a, b) => b.count - a.count)
+    }
+
+    // 构建复读率排行榜
+    const buildRateList = (countMap: Map<number, number>): RepeatRateItem[] => {
+      const items: RepeatRateItem[] = []
+      for (const [memberId, count] of countMap.entries()) {
+        const info = memberInfo.get(memberId)
+        const totalMessages = memberMessageCount.get(memberId) || 0
+        if (info && totalMessages > 0) {
+          items.push({
+            memberId,
+            platformId: info.platformId,
+            name: info.name,
+            count,
+            totalMessages,
+            rate: Math.round((count / totalMessages) * 10000) / 100,
+          })
+        }
+      }
+      // 按复读率降序排序
+      return items.sort((a, b) => b.rate - a.rate)
+    }
+
+    // 构建复读链长度分布
+    const chainLengthDistribution: ChainLengthDistribution[] = []
+    for (const [length, count] of chainLengthCount.entries()) {
+      chainLengthDistribution.push({ length, count })
+    }
+    chainLengthDistribution.sort((a, b) => a.length - b.length)
+
+    // 构建最长复读链 TOP 10（按单次复读链长度排序）
+    const hotContents: HotRepeatContent[] = []
+    for (const [content, stats] of contentStats.entries()) {
+      const originatorInfo = memberInfo.get(stats.originatorId)
+      hotContents.push({
+        content,
+        count: stats.count,
+        maxChainLength: stats.maxChainLength,
+        originatorName: originatorInfo?.name || '未知',
+      })
+    }
+    // 按最长复读链长度降序排序
+    hotContents.sort((a, b) => b.maxChainLength - a.maxChainLength)
+    const top10HotContents = hotContents.slice(0, 10)
+
+    return {
+      originators: buildRankList(originatorCount, totalRepeatChains),
+      initiators: buildRankList(initiatorCount, totalRepeatChains),
+      breakers: buildRankList(breakerCount, totalRepeatChains),
+      originatorRates: buildRateList(originatorCount),
+      initiatorRates: buildRateList(initiatorCount),
+      breakerRates: buildRateList(breakerCount),
+      chainLengthDistribution,
+      hotContents: top10HotContents,
+      avgChainLength: totalRepeatChains > 0 ? Math.round((totalChainLength / totalRepeatChains) * 100) / 100 : 0,
+      totalRepeatChains,
+    }
   } finally {
     db.close()
   }

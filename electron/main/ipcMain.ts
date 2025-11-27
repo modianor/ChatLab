@@ -360,6 +360,21 @@ const mainIpcMain = (win: BrowserWindow) => {
   ipcMain.handle('chat:getSupportedFormats', async () => {
     return parser.getSupportedFormats()
   })
+
+  /**
+   * 获取复读分析数据
+   */
+  ipcMain.handle(
+    'chat:getRepeatAnalysis',
+    async (_, sessionId: string, filter?: { startTs?: number; endTs?: number }) => {
+      try {
+        return database.getRepeatAnalysis(sessionId, filter)
+      } catch (error) {
+        console.error('获取复读分析失败：', error)
+        return { originators: [], initiators: [], breakers: [], totalRepeatChains: 0 }
+      }
+    }
+  )
 }
 
 export default mainIpcMain

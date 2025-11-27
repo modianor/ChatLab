@@ -7,6 +7,7 @@ import type {
   DailyActivity,
   MessageType,
   ImportProgress,
+  RepeatAnalysis,
 } from '../../src/types/chat'
 
 interface TimeFilter {
@@ -33,6 +34,7 @@ interface ChatApi {
   getDbDirectory: () => Promise<string | null>
   getSupportedFormats: () => Promise<Array<{ name: string; platform: string }>>
   onImportProgress: (callback: (progress: ImportProgress) => void) => () => void
+  getRepeatAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<RepeatAnalysis>
 }
 
 interface Api {

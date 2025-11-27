@@ -175,3 +175,75 @@ export interface ImportResult {
   sessionId?: string // 成功时返回会话ID
   error?: string // 失败时返回错误信息
 }
+
+// ==================== 复读分析类型 ====================
+
+/**
+ * 复读统计项（单个成员）- 绝对次数
+ */
+export interface RepeatStatItem {
+  memberId: number
+  platformId: string
+  name: string
+  count: number // 统计次数
+  percentage: number // 占总复读链的百分比
+}
+
+/**
+ * 复读率统计项（单个成员）- 相对比例
+ */
+export interface RepeatRateItem {
+  memberId: number
+  platformId: string
+  name: string
+  count: number // 复读相关次数
+  totalMessages: number // 该成员总发言数
+  rate: number // 复读率（百分比）
+}
+
+/**
+ * 复读链长度分布项
+ */
+export interface ChainLengthDistribution {
+  length: number // 复读链长度（参与人数）
+  count: number // 出现次数
+}
+
+/**
+ * 热门复读内容项
+ */
+export interface HotRepeatContent {
+  content: string // 复读内容
+  count: number // 被复读次数
+  maxChainLength: number // 最长复读链长度
+  originatorName: string // 最长链的原创者名称
+}
+
+/**
+ * 复读分析结果
+ */
+export interface RepeatAnalysis {
+  /** 谁的聊天最容易产生复读（原创者）- 绝对次数 */
+  originators: RepeatStatItem[]
+  /** 谁最喜欢挑起复读（第二个复读的人）- 绝对次数 */
+  initiators: RepeatStatItem[]
+  /** 谁喜欢打断复读（终结者）- 绝对次数 */
+  breakers: RepeatStatItem[]
+
+  /** 被复读率排名（相对比例） */
+  originatorRates: RepeatRateItem[]
+  /** 挑起复读率排名（相对比例） */
+  initiatorRates: RepeatRateItem[]
+  /** 打断复读率排名（相对比例） */
+  breakerRates: RepeatRateItem[]
+
+  /** 复读链长度分布 */
+  chainLengthDistribution: ChainLengthDistribution[]
+  /** 最火复读内容 TOP 10 */
+  hotContents: HotRepeatContent[]
+  /** 平均复读链长度 */
+  avgChainLength: number
+
+  /** 复读链总数 */
+  totalRepeatChains: number
+}

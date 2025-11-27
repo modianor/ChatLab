@@ -8,6 +8,7 @@ import type {
   DailyActivity,
   MessageType,
   ImportProgress,
+  RepeatAnalysis,
 } from '../../src/types/chat'
 
 // Custom APIs for renderer
@@ -151,6 +152,13 @@ const chatApi = {
     return () => {
       ipcRenderer.removeListener('chat:importProgress', handler)
     }
+  },
+
+  /**
+   * 获取复读分析数据
+   */
+  getRepeatAnalysis: (sessionId: string, filter?: { startTs?: number; endTs?: number }): Promise<RepeatAnalysis> => {
+    return ipcRenderer.invoke('chat:getRepeatAnalysis', sessionId, filter)
   },
 }
 

@@ -238,6 +238,7 @@ onMounted(loadData)
             v-else-if="activeTab === 'members'"
             :session-id="currentSessionId!"
             :member-activity="memberActivity"
+            :time-filter="timeFilter"
           />
           <TimelineTab
             v-else-if="activeTab === 'timeline'"
