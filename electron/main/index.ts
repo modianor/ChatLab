@@ -45,7 +45,7 @@ class MainProcess {
   // 初始化程序
   async init() {
     // 注册应用协议
-    app.setAsDefaultProtocolClient('chatlens')
+    app.setAsDefaultProtocolClient('chatlab')
 
     // 应用程序准备好之前注册
     protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true } }])

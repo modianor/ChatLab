@@ -1,7 +1,7 @@
 # 应用程序的唯一标识符
-appId: com.chatlens.app
+appId: com.chatlab.app
 # 应用程序的产品名称
-productName: ChatLens
+productName: ChatLab
 # 构建资源所在的目录
 directories:
   buildResources: build
@@ -19,13 +19,13 @@ asarUnpack:
 
 # Windows 平台配置
 win:
-  executableName: ChatLens
+  executableName: ChatLab
   target: nsis
 
 # NSIS 安装器配置
 nsis:
   oneClick: false
-  artifactName: ChatLens-${version}-setup.${ext}
+  artifactName: ChatLab-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -43,11 +43,11 @@ mac:
 
 # macOS 平台的 DMG 配置
 dmg:
-  artifactName: ChatLens-${version}.${ext}
+  artifactName: ChatLab-${version}.${ext}
 
 # Linux 平台配置
 linux:
-  executableName: chatlens
+  executableName: chatlab
   icon: build/icon.png
   target:
     - AppImage
@@ -58,7 +58,7 @@ linux:
 
 # AppImage 配置
 appImage:
-  artifactName: ChatLens-${version}.${ext}
+  artifactName: ChatLab-${version}.${ext}
 
 # 是否在构建之前重新编译原生模块
 npmRebuild: false

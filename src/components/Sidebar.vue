@@ -73,7 +73,7 @@ function cancelDelete() {
     <div class="flex flex-col p-4">
       <!-- Header / Toggle -->
       <div class="mb-6 flex items-center" :class="[isCollapsed ? 'justify-center' : 'justify-between']">
-        <div v-if="!isCollapsed" class="text-lg font-semibold text-gray-900 dark:text-white">ChatLens</div>
+        <div v-if="!isCollapsed" class="text-lg font-semibold text-gray-900 dark:text-white">ChatLab</div>
         <UButton icon="i-heroicons-bars-3" color="gray" variant="ghost" size="sm" @click="toggleSidebar" />
       </div>
 

@@ -21,7 +21,7 @@ function getDbDir(): string {
   try {
     const docPath = app.getPath('documents')
     console.log('[Database] app.getPath("documents"):', docPath)
-    DB_DIR = path.join(docPath, 'ChatLens', 'databases')
+    DB_DIR = path.join(docPath, 'ChatLab', 'databases')
   } catch (error) {
     console.error('[Database] Error getting userData path:', error)
     DB_DIR = path.join(process.cwd(), 'databases')

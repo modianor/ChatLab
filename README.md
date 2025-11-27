@@ -1,4 +1,4 @@
-# ChatLens
+# ChatLab
 
 聊天记录分析工具
 

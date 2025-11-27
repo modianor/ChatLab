@@ -131,7 +131,7 @@ function getProgressText(): string {
         <h1
           class="mb-4 bg-linear-to-r from-purple-600 via-pink-500 to-orange-400 bg-clip-text text-5xl font-black tracking-tight text-transparent sm:text-6xl"
         >
-          ChatLens
+          ChatLab
         </h1>
         <p class="text-lg font-medium text-gray-500 dark:text-gray-400">获取你的聊天记录分析报告</p>
       </div>

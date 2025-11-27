@@ -1,6 +1,6 @@
 # 图表组件库
 
-这是一个基于 `vue-chartjs` 和 `Chart.js` 的可复用图表组件库，专为 ChatLens 项目设计。所有组件都已经过封装，只需传入数据和简单配置即可使用。
+这是一个基于 `vue-chartjs` 和 `Chart.js` 的可复用图表组件库，专为 ChatLab 项目设计。所有组件都已经过封装，只需传入数据和简单配置即可使用。
 
 ## 📦 组件列表
 
@@ -260,7 +260,7 @@ import { ProgressBar } from '@/components/charts'
 
 ### 颜色方案
 
-所有图表组件使用统一的配色方案，与 ChatLens 的设计语言保持一致：
+所有图表组件使用统一的配色方案，与 ChatLab 的设计语言保持一致：
 
 - 主色调：Indigo (#6366f1)
 - 辅助色：Violet, Purple, Pink, Rose
