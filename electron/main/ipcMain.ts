@@ -536,6 +536,26 @@ const mainIpcMain = (win: BrowserWindow) => {
       }
     }
   )
+
+  /**
+   * 获取斗图分析数据
+   */
+  ipcMain.handle(
+    'chat:getMemeBattleAnalysis',
+    async (_, sessionId: string, filter?: { startTs?: number; endTs?: number }) => {
+      try {
+        return await worker.getMemeBattleAnalysis(sessionId, filter)
+      } catch (error) {
+        console.error('获取斗图分析失败：', error)
+        return {
+          longestBattle: null,
+          rankByCount: [],
+          rankByImageCount: [],
+          totalBattles: 0,
+        }
+      }
+    }
+  )
 }
 
 export default mainIpcMain

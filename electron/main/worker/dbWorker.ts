@@ -33,6 +33,7 @@ import {
   getMonologueAnalysis,
   getMentionAnalysis,
   getLaughAnalysis,
+  getMemeBattleAnalysis,
 } from './queryAdvanced'
 
 // 初始化数据库目录
@@ -80,6 +81,7 @@ const handlers: Record<string, (payload: any) => any> = {
   getMonologueAnalysis: (p) => getMonologueAnalysis(p.sessionId, p.filter),
   getMentionAnalysis: (p) => getMentionAnalysis(p.sessionId, p.filter),
   getLaughAnalysis: (p) => getLaughAnalysis(p.sessionId, p.filter, p.keywords),
+  getMemeBattleAnalysis: (p) => getMemeBattleAnalysis(p.sessionId, p.filter),
 }
 
 // 处理消息

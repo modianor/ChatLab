@@ -239,6 +239,10 @@ export async function getLaughAnalysis(sessionId: string, filter?: any, keywords
   return sendToWorker('getLaughAnalysis', { sessionId, filter, keywords })
 }
 
+export async function getMemeBattleAnalysis(sessionId: string, filter?: any): Promise<any> {
+  return sendToWorker('getMemeBattleAnalysis', { sessionId, filter })
+}
+
 export async function getAllSessions(): Promise<any[]> {
   return sendToWorker('getAllSessions', {})
 }

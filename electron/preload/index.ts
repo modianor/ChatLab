@@ -18,6 +18,7 @@ import type {
   MonologueAnalysis,
   MentionAnalysis,
   LaughAnalysis,
+  MemeBattleAnalysis,
 } from '../../src/types/chat'
 
 // Custom APIs for renderer
@@ -253,6 +254,16 @@ const chatApi = {
     keywords?: string[]
   ): Promise<LaughAnalysis> => {
     return ipcRenderer.invoke('chat:getLaughAnalysis', sessionId, filter, keywords)
+  },
+
+  /**
+   * 获取斗图分析数据
+   */
+  getMemeBattleAnalysis: (
+    sessionId: string,
+    filter?: { startTs?: number; endTs?: number }
+  ): Promise<MemeBattleAnalysis> => {
+    return ipcRenderer.invoke('chat:getMemeBattleAnalysis', sessionId, filter)
   },
 }
 

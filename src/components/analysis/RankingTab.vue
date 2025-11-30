@@ -6,6 +6,7 @@ import type { RankItem } from '@/components/charts'
 import { PageAnchorsNav } from '@/components/UI'
 import { usePageAnchors } from '@/composables'
 import DragonKingRank from './ranking/DragonKingRank.vue'
+import MemeBattleRank from './ranking/MemeBattleRank.vue'
 import MonologueRank from './ranking/MonologueRank.vue'
 import RepeatSection from './ranking/RepeatSection.vue'
 import DivingRank from './ranking/DivingRank.vue'
@@ -26,6 +27,7 @@ const props = defineProps<{
 const anchors = [
   { id: 'member-activity', label: '📊 水群榜' },
   { id: 'dragon-king', label: '🐉 龙王榜' },
+  { id: 'meme-battle', label: '⚔️ 斗图榜' },
   { id: 'monologue', label: '🎤 自言自语榜' },
   { id: 'repeat', label: '🔁 复读榜' },
   { id: 'night-owl', label: '🦉 修仙榜' },
@@ -58,6 +60,11 @@ const memberRankData = computed<RankItem[]>(() => {
       <!-- 龙王排名 -->
       <div id="dragon-king" class="scroll-mt-24">
         <DragonKingRank :session-id="sessionId" :time-filter="timeFilter" />
+      </div>
+
+      <!-- 斗图榜 -->
+      <div id="meme-battle" class="scroll-mt-24">
+        <MemeBattleRank :session-id="sessionId" :time-filter="timeFilter" />
       </div>
 
       <!-- 自言自语榜 -->

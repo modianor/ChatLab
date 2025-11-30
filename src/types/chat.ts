@@ -612,3 +612,41 @@ export interface KeywordTemplate {
   name: string
   keywords: string[]
 }
+
+// ==================== 斗图分析类型 ====================
+
+/**
+ * 斗图达人榜项
+ */
+export interface MemeBattleRankItem {
+  memberId: number
+  platformId: string
+  name: string
+  count: number // 参与场次 或 图片总数
+  percentage: number // 占比
+}
+
+/**
+ * 斗图记录（一场）
+ */
+export interface MemeBattleRecord {
+  startTime: number // 开始时间戳
+  endTime: number // 结束时间戳
+  totalImages: number // 总图片数
+  participantCount: number // 参与人数
+  participants: Array<{
+    memberId: number
+    name: string
+    imageCount: number // 在该场斗图中发的图片数
+  }>
+}
+
+/**
+ * 斗图分析结果
+ */
+export interface MemeBattleAnalysis {
+  topBattles: MemeBattleRecord[] // 史诗级斗图榜（前30）
+  rankByCount: MemeBattleRankItem[] // 按参与场次排名
+  rankByImageCount: MemeBattleRankItem[] // 按图片总数排名
+  totalBattles: number // 总斗图场次
+}

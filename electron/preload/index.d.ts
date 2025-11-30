@@ -17,6 +17,7 @@ import type {
   MonologueAnalysis,
   MentionAnalysis,
   LaughAnalysis,
+  MemeBattleAnalysis,
 } from '../../src/types/chat'
 
 interface TimeFilter {
@@ -53,6 +54,7 @@ interface ChatApi {
   getMonologueAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MonologueAnalysis>
   getMentionAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MentionAnalysis>
   getLaughAnalysis: (sessionId: string, filter?: TimeFilter, keywords?: string[]) => Promise<LaughAnalysis>
+  getMemeBattleAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MemeBattleAnalysis>
 }
 
 interface Api {
