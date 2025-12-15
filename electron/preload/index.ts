@@ -405,6 +405,7 @@ interface SearchMessageResult {
   id: number
   senderName: string
   senderPlatformId: string
+  senderAliases: string[]
   content: string
   timestamp: number
   type: number

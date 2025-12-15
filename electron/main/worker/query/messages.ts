@@ -15,6 +15,7 @@ export interface MessageResult {
   id: number
   senderName: string
   senderPlatformId: string
+  senderAliases: string[]
   content: string
   timestamp: number
   type: number
@@ -39,14 +40,38 @@ export interface MessagesWithTotal {
 // ==================== 工具函数 ====================
 
 /**
+ * 数据库行类型（包含 aliases JSON 字符串）
+ */
+interface DbMessageRow {
+  id: number
+  senderName: string
+  senderPlatformId: string
+  aliases: string | null
+  content: string
+  timestamp: number
+  type: number
+}
+
+/**
  * 将数据库行转换为可序列化的 MessageResult
  * 处理 BigInt 等类型，确保 IPC 传输安全
  */
-function sanitizeMessageRow(row: MessageResult): MessageResult {
+function sanitizeMessageRow(row: DbMessageRow): MessageResult {
+  // 解析别名 JSON
+  let aliases: string[] = []
+  if (row.aliases) {
+    try {
+      aliases = JSON.parse(row.aliases)
+    } catch {
+      aliases = []
+    }
+  }
+
   return {
     id: Number(row.id),
     senderName: String(row.senderName || ''),
     senderPlatformId: String(row.senderPlatformId || ''),
+    senderAliases: aliases,
     content: row.content != null ? String(row.content) : '',
     timestamp: Number(row.timestamp),
     type: Number(row.type),
@@ -120,6 +145,7 @@ export function getRecentMessages(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -133,7 +159,7 @@ export function getRecentMessages(
     LIMIT ?
   `
 
-  const rows = db.prepare(sql).all(...timeParams, limit) as MessageResult[]
+  const rows = db.prepare(sql).all(...timeParams, limit) as DbMessageRow[]
 
   // 返回时按时间正序排列（便于阅读）
   return {
@@ -196,6 +222,7 @@ export function searchMessages(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -209,7 +236,7 @@ export function searchMessages(
     LIMIT ? OFFSET ?
   `
 
-  const rows = db.prepare(sql).all(...keywordParams, ...timeParams, ...senderParams, limit, offset) as MessageResult[]
+  const rows = db.prepare(sql).all(...keywordParams, ...timeParams, ...senderParams, limit, offset) as DbMessageRow[]
 
   return {
     messages: rows.map(sanitizeMessageRow),
@@ -277,6 +304,7 @@ export function getMessageContext(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -286,7 +314,7 @@ export function getMessageContext(
     ORDER BY msg.id ASC
   `
 
-  const rows = db.prepare(sql).all(...idList) as MessageResult[]
+  const rows = db.prepare(sql).all(...idList) as DbMessageRow[]
 
   return rows.map(sanitizeMessageRow)
 }
@@ -326,6 +354,7 @@ export function getMessagesBefore(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -340,7 +369,7 @@ export function getMessagesBefore(
     LIMIT ?
   `
 
-  const rows = db.prepare(sql).all(beforeId, ...timeParams, ...keywordParams, ...senderParams, limit + 1) as MessageResult[]
+  const rows = db.prepare(sql).all(beforeId, ...timeParams, ...keywordParams, ...senderParams, limit + 1) as DbMessageRow[]
 
   const hasMore = rows.length > limit
   const resultRows = hasMore ? rows.slice(0, limit) : rows
@@ -387,6 +416,7 @@ export function getMessagesAfter(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -401,7 +431,7 @@ export function getMessagesAfter(
     LIMIT ?
   `
 
-  const rows = db.prepare(sql).all(afterId, ...timeParams, ...keywordParams, ...senderParams, limit + 1) as MessageResult[]
+  const rows = db.prepare(sql).all(afterId, ...timeParams, ...keywordParams, ...senderParams, limit + 1) as DbMessageRow[]
 
   const hasMore = rows.length > limit
   const resultRows = hasMore ? rows.slice(0, limit) : rows
@@ -468,6 +498,7 @@ export function getConversationBetween(
       msg.id,
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
+      m.aliases,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -480,7 +511,7 @@ export function getConversationBetween(
     LIMIT ?
   `
 
-  const rows = db.prepare(sql).all(memberId1, memberId2, ...timeParams, limit) as MessageResult[]
+  const rows = db.prepare(sql).all(memberId1, memberId2, ...timeParams, limit) as DbMessageRow[]
 
   // 返回时按时间正序排列（便于阅读对话）
   return {

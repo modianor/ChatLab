@@ -12,11 +12,18 @@ import QuotesTab from './components/QuotesTab.vue'
 import MemberTab from './components/MemberTab.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useSessionStore } from '@/stores/session'
+import { useLayoutStore } from '@/stores/layout'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
+const layoutStore = useLayoutStore()
 const { currentSessionId } = storeToRefs(sessionStore)
+
+// 打开聊天记录查看器
+function openChatRecordViewer() {
+  layoutStore.openChatRecordDrawer({})
+}
 
 // 数据状态
 const isLoading = ref(true)
@@ -225,6 +232,15 @@ onMounted(() => {
         icon="i-heroicons-user"
       >
         <template #actions>
+          <UTooltip text="聊天记录查看器">
+            <UButton
+              icon="i-heroicons-chat-bubble-bottom-center-text"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="openChatRecordViewer"
+            />
+          </UTooltip>
           <CaptureButton tooltip="截屏当前页面" />
         </template>
         <!-- Tabs -->

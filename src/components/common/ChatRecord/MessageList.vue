@@ -3,7 +3,7 @@
  * 消息列表组件
  * 支持无限滚动加载
  */
-import { ref, watch, nextTick, toRaw } from 'vue'
+import { ref, watch, nextTick, toRaw, computed } from 'vue'
 import MessageItem from './MessageItem.vue'
 import type { ChatRecordMessage, ChatRecordQuery } from './types'
 import { useSessionStore } from '@/stores/session'
@@ -20,12 +20,24 @@ const emit = defineEmits<{
 
 const sessionStore = useSessionStore()
 
+// 判断是否处于筛选模式（有筛选条件且消息不连贯时显示上下文按钮）
+// 注意：通过消息 ID 定位时上下文是连贯的，不需要显示
+const isFiltered = computed(() => {
+  const q = props.query
+  // 只有关键词、成员筛选时才需要显示上下文按钮
+  return !!(q.memberId || q.keywords?.length)
+})
+
 // 消息列表
 const messages = ref<ChatRecordMessage[]>([])
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
 const hasMoreBefore = ref(false)
 const hasMoreAfter = ref(false)
+
+// 搜索模式相关状态
+const isSearchMode = ref(false)
+const searchOffset = ref(0)
 
 // 滚动容器引用
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -77,12 +89,31 @@ async function loadInitialMessages() {
       setTimeout(() => {
         scrollToMessage(targetId)
       }, 100)
+    } else if (keywords && keywords.length > 0) {
+      // 有关键词，使用搜索功能
+      isSearchMode.value = true
+      searchOffset.value = 0
+      const result = await window.aiApi.searchMessages(sessionId, keywords, filter, 100, 0, senderId)
+      messages.value = result.messages
+      hasMoreBefore.value = false // 搜索结果从最新开始，没有更早的
+      hasMoreAfter.value = result.messages.length >= 100
+      searchOffset.value = result.messages.length
+
+      // 滚动到顶部
+      await nextTick()
+      scrollToTop()
     } else {
-      // 没有目标消息，加载最新的 100 条
+      // 没有目标消息和关键词，加载最新的 100 条
+      isSearchMode.value = false
+      searchOffset.value = 0
       const result = await window.aiApi.getRecentMessages(sessionId, filter, 100)
       messages.value = result.messages
       hasMoreBefore.value = result.messages.length >= 100
       hasMoreAfter.value = false
+
+      // 滚动到顶部
+      await nextTick()
+      scrollToTop()
     }
 
     emit('count-change', messages.value.length)
@@ -92,6 +123,14 @@ async function loadInitialMessages() {
     emit('count-change', 0)
   } finally {
     isLoading.value = false
+  }
+}
+
+// 滚动到顶部
+function scrollToTop() {
+  const container = scrollContainerRef.value
+  if (container) {
+    container.scrollTop = 0
   }
 }
 
@@ -138,31 +177,46 @@ async function loadMoreBefore() {
   }
 }
 
-// 加载更新的消息（向下滚动）
+// 加载更多消息（向下滚动）
 async function loadMoreAfter() {
   if (isLoadingMore.value || !hasMoreAfter.value || messages.value.length === 0) return
 
   const sessionId = sessionStore.currentSessionId
   if (!sessionId) return
 
-  const lastMessage = messages.value[messages.value.length - 1]
-  if (!lastMessage) return
-
   isLoadingMore.value = true
 
   try {
     const query = toRaw(props.query)
     const { filter, senderId, keywords } = buildFilterParams(query)
-    const result = await window.aiApi.getMessagesAfter(sessionId, lastMessage.id, 50, filter, senderId, keywords)
 
-    if (result.messages.length > 0) {
-      messages.value = [...messages.value, ...result.messages]
-      emit('count-change', messages.value.length)
+    if (isSearchMode.value && keywords && keywords.length > 0) {
+      // 搜索模式：使用分页加载
+      const result = await window.aiApi.searchMessages(sessionId, keywords, filter, 50, searchOffset.value, senderId)
+
+      if (result.messages.length > 0) {
+        messages.value = [...messages.value, ...result.messages]
+        searchOffset.value += result.messages.length
+        emit('count-change', messages.value.length)
+      }
+
+      hasMoreAfter.value = result.messages.length >= 50
+    } else {
+      // 普通模式：使用消息 ID 加载
+      const lastMessage = messages.value[messages.value.length - 1]
+      if (!lastMessage) return
+
+      const result = await window.aiApi.getMessagesAfter(sessionId, lastMessage.id, 50, filter, senderId, keywords)
+
+      if (result.messages.length > 0) {
+        messages.value = [...messages.value, ...result.messages]
+        emit('count-change', messages.value.length)
+      }
+
+      hasMoreAfter.value = result.hasMore
     }
-
-    hasMoreAfter.value = result.hasMore
   } catch (e) {
-    console.error('加载更新消息失败:', e)
+    console.error('加载更多消息失败:', e)
   } finally {
     isLoadingMore.value = false
   }
@@ -247,7 +301,7 @@ defineExpose({
       </div>
 
       <!-- 消息列表 -->
-      <div class="divide-y divide-gray-100 dark:divide-gray-800">
+      <div class="space-y-1 py-2">
         <MessageItem
           v-for="msg in messages"
           :key="msg.id"
@@ -255,6 +309,7 @@ defineExpose({
           :message="msg"
           :is-target="isTargetMessage(msg.id)"
           :highlight-keywords="query.highlightKeywords"
+          :is-filtered="isFiltered"
         />
       </div>
 

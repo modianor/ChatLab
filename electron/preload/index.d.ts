@@ -99,6 +99,7 @@ interface SearchMessageResult {
   id: number
   senderName: string
   senderPlatformId: string
+  senderAliases: string[]
   content: string
   timestamp: number
   type: number
@@ -142,9 +143,42 @@ interface AiApi {
     keywords: string[],
     filter?: TimeFilter,
     limit?: number,
-    offset?: number
+    offset?: number,
+    senderId?: number
   ) => Promise<{ messages: SearchMessageResult[]; total: number }>
-  getMessageContext: (sessionId: string, messageId: number, contextSize?: number) => Promise<SearchMessageResult[]>
+  getMessageContext: (
+    sessionId: string,
+    messageIds: number | number[],
+    contextSize?: number
+  ) => Promise<SearchMessageResult[]>
+  getRecentMessages: (
+    sessionId: string,
+    filter?: TimeFilter,
+    limit?: number
+  ) => Promise<{ messages: SearchMessageResult[]; total: number }>
+  getConversationBetween: (
+    sessionId: string,
+    memberId1: number,
+    memberId2: number,
+    filter?: TimeFilter,
+    limit?: number
+  ) => Promise<{ messages: SearchMessageResult[]; total: number; member1Name: string; member2Name: string }>
+  getMessagesBefore: (
+    sessionId: string,
+    beforeId: number,
+    limit?: number,
+    filter?: TimeFilter,
+    senderId?: number,
+    keywords?: string[]
+  ) => Promise<{ messages: SearchMessageResult[]; hasMore: boolean }>
+  getMessagesAfter: (
+    sessionId: string,
+    afterId: number,
+    limit?: number,
+    filter?: TimeFilter,
+    senderId?: number,
+    keywords?: string[]
+  ) => Promise<{ messages: SearchMessageResult[]; hasMore: boolean }>
   createConversation: (sessionId: string, title?: string) => Promise<AIConversation>
   getConversations: (sessionId: string) => Promise<AIConversation[]>
   getConversation: (conversationId: string) => Promise<AIConversation | null>
