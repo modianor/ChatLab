@@ -33,3 +33,5 @@ yarn.lock
 # AI
 .cursor
 .vscode
+.docs
+

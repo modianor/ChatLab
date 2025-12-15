@@ -46,9 +46,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # macOS 签名和公证需要的 API Key 文件
+      - name: Create Apple API Key File
+        run: |
+          mkdir -p ~/private_keys
+          echo "${{ secrets.APPLE_API_KEY }}" > ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+
       - name: Build Electron app for macOS
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # 代码签名
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # 公证
+          APPLE_API_KEY: ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: pnpm build:mac
 
       - name: Upload macOS artifacts
@@ -62,6 +75,7 @@ jobs:
             dist/*.json
             dist/*.blockmap
           if-no-files-found: warn
+          retention-days: 1 # 只保留1天，Release后会上传到GitHub Releases
 
   build-win:
     runs-on: windows-latest
@@ -110,6 +124,7 @@ jobs:
             dist/*.json
             dist/*.blockmap
           if-no-files-found: warn
+          retention-days: 1 # 只保留1天，Release后会上传到GitHub Releases
 
   release:
     needs: [build-mac, build-win]
@@ -137,12 +152,9 @@ jobs:
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
           name: ChatLab ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-          repository: hellodigua/ChatLab
-          target_commitish: main
-          token: ${{ secrets.GH_TOKEN }}
           files: |
             dist/*.exe
             dist/*.dmg
             dist/*.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

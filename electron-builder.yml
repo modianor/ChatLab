@@ -1,12 +1,12 @@
 # 应用程序的唯一标识符
-appId: com.chatlab.app
+appId: com.chatlab.fun
 # 应用程序的产品名称
 productName: ChatLab
 # 发布配置
 publish:
   provider: github
   owner: hellodigua
-  repo: ChatLab
+  repo: ChatLab-source
 # 构建资源所在的目录
 directories:
   buildResources: build
@@ -43,12 +43,23 @@ nsis:
 # macOS 平台配置
 mac:
   entitlementsInherit: build/entitlements.mac.plist
+  entitlements: build/entitlements.mac.plist
+  # 代码签名 - Hardened Runtime 是公证的必要条件
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # 公证配置 - v26 自动检测环境变量进行公证，无需额外配置
   extendInfo:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
   artifactName: ChatLab-${version}-${arch}.${ext}
 
 # macOS 平台的 DMG 配置
