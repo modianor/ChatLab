@@ -78,7 +78,29 @@ function getAiDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_ai_message_conversation ON ai_message(conversation_id);
   `)
 
+  // 数据库迁移：为旧数据库添加缺失的列
+  migrateAiDatabase(AI_DB)
+
   return AI_DB
+}
+
+/**
+ * 数据库迁移：检查并添加缺失的列
+ */
+function migrateAiDatabase(db: Database.Database): void {
+  try {
+    // 获取 ai_message 表的列信息
+    const tableInfo = db.pragma('table_info(ai_message)') as Array<{ name: string }>
+    const columnNames = tableInfo.map((col) => col.name)
+
+    // 检查并添加 content_blocks 列
+    if (!columnNames.includes('content_blocks')) {
+      db.exec('ALTER TABLE ai_message ADD COLUMN content_blocks TEXT')
+      console.log('[AI DB Migration] 添加 content_blocks 列')
+    }
+  } catch (error) {
+    console.error('[AI DB Migration] 迁移失败：', error)
+  }
 }
 
 /**
