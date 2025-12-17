@@ -4,6 +4,7 @@ import { optimizer, is, platform } from '@electron-toolkit/utils'
 import * as fs from 'fs/promises'
 import { checkUpdate } from './update'
 import mainIpcMain from './ipcMain'
+import { initAnalytics, trackDailyActive } from './analytics'
 
 class MainProcess {
   mainWindow: BrowserWindow | null
@@ -44,6 +45,8 @@ class MainProcess {
 
   // 初始化程序
   async init() {
+    initAnalytics()
+
     // 注册应用协议
     app.setAsDefaultProtocolClient('chatlab')
 
@@ -100,6 +103,9 @@ class MainProcess {
       console.log('[Main] App is ready')
       // 设置Windows应用程序用户模型id
       if (process.platform === 'win32') app.setAppUserModelId(app.getName())
+
+      // 记录日活（用于统计操作系统版本、客户端版本，便于更好的适配客户端）
+      trackDailyActive()
 
       // 创建主窗口
       console.log('[Main] Creating window...')
