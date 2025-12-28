@@ -657,6 +657,22 @@ export async function streamImport(filePath: string, requestId: string): Promise
     // 写入日志摘要
     logSummary(totalMessageCount, memberIdMap.size)
 
+    // 检查消息数量，如果为 0 则视为导入失败
+    if (totalMessageCount === 0) {
+      logError('导入失败：未解析到任何消息，可能是文件格式不匹配或内容为空')
+
+      // 删除空的数据库文件
+      const dbPath = getDbPath(sessionId)
+      if (fs.existsSync(dbPath)) {
+        fs.unlinkSync(dbPath)
+      }
+
+      return {
+        success: false,
+        error: '未解析到任何消息，请检查文件格式是否正确',
+      }
+    }
+
     return { success: true, sessionId }
   } catch (error) {
     // 记录错误日志

@@ -1014,6 +1014,20 @@ const cacheApi = {
   ): Promise<{ success: boolean; filePath?: string; error?: string }> => {
     return ipcRenderer.invoke('cache:saveToDownloads', filename, dataUrl)
   },
+
+  /**
+   * 获取最新的导入日志文件路径
+   */
+  getLatestImportLog: (): Promise<{ success: boolean; path?: string; name?: string; error?: string }> => {
+    return ipcRenderer.invoke('cache:getLatestImportLog')
+  },
+
+  /**
+   * 在文件管理器中显示并高亮文件
+   */
+  showInFolder: (filePath: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('cache:showInFolder', filePath)
+  },
 }
 
 // 扩展 api，添加 dialog、clipboard 和应用功能

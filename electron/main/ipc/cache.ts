@@ -239,4 +239,59 @@ export function registerCacheHandlers(_context: IpcContext): void {
       return { success: false, error: String(error) }
     }
   })
+
+  /**
+   * 获取最新的导入日志文件路径
+   */
+  ipcMain.handle('cache:getLatestImportLog', async () => {
+    const chatLabDir = getChatLabDir()
+    const importLogDir = path.join(chatLabDir, 'logs', 'import')
+
+    try {
+      if (!fsSync.existsSync(importLogDir)) {
+        return { success: false, error: '日志目录不存在' }
+      }
+
+      const files = await fs.readdir(importLogDir)
+      const logFiles = files.filter((f) => f.startsWith('import_') && f.endsWith('.log'))
+
+      if (logFiles.length === 0) {
+        return { success: false, error: '没有找到导入日志' }
+      }
+
+      // 按修改时间排序，获取最新的
+      const fileStats = await Promise.all(
+        logFiles.map(async (f) => {
+          const filePath = path.join(importLogDir, f)
+          const stat = await fs.stat(filePath)
+          return { name: f, path: filePath, mtime: stat.mtime.getTime() }
+        })
+      )
+
+      fileStats.sort((a, b) => b.mtime - a.mtime)
+      const latestLog = fileStats[0]
+
+      return { success: true, path: latestLog.path, name: latestLog.name }
+    } catch (error) {
+      console.error('[Cache] Error getting latest import log:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  /**
+   * 在文件管理器中显示并高亮文件
+   */
+  ipcMain.handle('cache:showInFolder', async (_, filePath: string) => {
+    try {
+      if (!fsSync.existsSync(filePath)) {
+        return { success: false, error: '文件不存在' }
+      }
+
+      shell.showItemInFolder(filePath)
+      return { success: true }
+    } catch (error) {
+      console.error('[Cache] Error showing file in folder:', error)
+      return { success: false, error: String(error) }
+    }
+  })
 }
