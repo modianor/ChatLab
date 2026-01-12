@@ -73,7 +73,7 @@ watch(locale, () => {
 </script>
 
 <template>
-  <div class="px-4 py-2 dark:border-gray-800 space-y-2 mb-4">
+  <div class="px-4 py-2 dark:border-gray-800 space-y-2 mb-2">
     <!-- 帮助和反馈 -->
     <UPopover :popper="{ placement: 'right' }">
       <SidebarButton icon="i-heroicons-information-circle" :title="t('sidebar.footer.helpAndFeedback')" />

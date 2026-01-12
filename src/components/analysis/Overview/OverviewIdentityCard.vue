@@ -12,33 +12,39 @@ defineProps<{
 </script>
 
 <template>
-  <div class="relative overflow-hidden rounded-3xl bg-pink-500 p-8 text-white shadow-xl">
+  <div
+    class="relative overflow-hidden rounded-3xl bg-white p-8 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800/50 dark:ring-gray-800"
+  >
     <div class="relative">
       <div>
         <div class="flex items-center gap-3">
-          <h2 class="text-3xl font-black tracking-tight">{{ session.name }}</h2>
-          <span class="rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-md">
+          <h2 class="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{{ session.name }}</h2>
+          <span
+            class="rounded-full bg-pink-50 px-3 py-1 text-xs font-medium text-pink-600 dark:bg-pink-500/10 dark:text-pink-400"
+          >
             {{ session.platform.toUpperCase() }}
           </span>
         </div>
-        <p class="mt-2 text-lg text-white/90 font-medium">
+        <p class="mt-2 text-lg font-medium text-gray-500 dark:text-gray-400">
           {{ session.type === 'private' ? t('privateChat') : t('groupChat') }} ·
           <span class="opacity-80">{{ t('analysisReport') }}</span>
         </p>
       </div>
 
       <div class="mt-8 grid grid-cols-3 gap-6">
-        <div class="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md">
-          <p class="text-3xl font-black tracking-tight">{{ session.messageCount.toLocaleString() }}</p>
-          <p class="mt-1 text-sm font-medium text-white/70">{{ t('totalMessages') }}</p>
+        <div class="rounded-2xl bg-gray-50 px-6 py-4 dark:bg-gray-800">
+          <p class="text-3xl font-black tracking-tight text-gray-900 dark:text-white">
+            {{ session.messageCount.toLocaleString() }}
+          </p>
+          <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('totalMessages') }}</p>
         </div>
-        <div class="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md">
-          <p class="text-3xl font-black tracking-tight">{{ totalDurationDays }}</p>
-          <p class="mt-1 text-sm font-medium text-white/70">{{ t('durationDays') }}</p>
+        <div class="rounded-2xl bg-gray-50 px-6 py-4 dark:bg-gray-800">
+          <p class="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{{ totalDurationDays }}</p>
+          <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('durationDays') }}</p>
         </div>
-        <div class="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md">
-          <p class="text-3xl font-black tracking-tight">{{ totalDailyAvgMessages }}</p>
-          <p class="mt-1 text-sm font-medium text-white/70">{{ t('dailyAvgMessages') }}</p>
+        <div class="rounded-2xl bg-gray-50 px-6 py-4 dark:bg-gray-800">
+          <p class="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{{ totalDailyAvgMessages }}</p>
+          <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('dailyAvgMessages') }}</p>
         </div>
       </div>
     </div>

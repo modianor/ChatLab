@@ -266,6 +266,7 @@ onMounted(() => {
         "
         :avatar="session.groupAvatar"
         icon="i-heroicons-chat-bubble-left-right"
+        icon-class="bg-primary-600 text-white dark:bg-primary-500 dark:text-white"
       >
         <template #actions>
           <UTooltip :text="t('analysis.tooltip.chatViewer')">

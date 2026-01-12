@@ -138,9 +138,14 @@ watch(
 </script>
 
 <template>
-  <UDrawer v-model:open="layoutStore.showChatRecordDrawer" direction="right" :handle="false" :ui="{ content: 'z-100' }">
+  <UDrawer
+    v-model:open="layoutStore.showChatRecordDrawer"
+    direction="right"
+    :handle="false"
+    :ui="{ content: 'z-[10000]' }"
+  >
     <template #content>
-      <div class="flex h-full w-[680px] flex-col bg-white dark:bg-gray-900">
+      <div class="flex h-full w-[680px] flex-col bg-white dark:bg-gray-900" style="-webkit-app-region: no-drag">
         <!-- 头部 -->
         <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('title') }}</h3>

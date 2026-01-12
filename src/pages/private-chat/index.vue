@@ -217,6 +217,30 @@ watch([activeTab, selectedYear], ([newTab, newYear]) => {
   })
 })
 
+// 获取对方头像
+const otherMemberAvatar = computed(() => {
+  if (!session.value || memberActivity.value.length === 0) return null
+
+  // 1. 优先尝试排除 ownerId
+  if (session.value.ownerId) {
+    const other = memberActivity.value.find((m) => m.platformId !== session.value?.ownerId)
+    if (other?.avatar) return other.avatar
+  }
+
+  // 2. 尝试匹配会话名称 (通常私聊名称就是对方昵称)
+  const sameName = memberActivity.value.find((m) => m.name === session.value?.name)
+  if (sameName?.avatar) return sameName.avatar
+
+  // 3. 如果只有两个成员，取另一个
+  if (memberActivity.value.length === 2) {
+    // 这里很难判断谁是"另一个"，因为不知道谁是"我"
+    // 但通常 memberActivity 是按消息数排序的，或者按 ID 排序
+    // 暂时不盲目取
+  }
+
+  return null
+})
+
 onMounted(() => {
   syncSession()
 })
@@ -238,7 +262,9 @@ onMounted(() => {
             messageCount: selectedYear ? filteredMessageCount : session.messageCount,
           })
         "
+        :avatar="otherMemberAvatar"
         icon="i-heroicons-user"
+        icon-class="bg-pink-600 text-white dark:bg-pink-500 dark:text-white"
       >
         <template #actions>
           <UTooltip :text="t('analysis.tooltip.chatViewer')">
