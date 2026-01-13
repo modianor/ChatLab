@@ -14,8 +14,14 @@ const REMOTE_PRESET_BASE_URL = 'https://chatlab.fun'
 export interface RemotePresetData {
   id: string
   name: string
-  roleDefinition: string
-  responseRules: string
+  /** Markdown 文件绝对路径（如 /cn/system-prompt/xxx.md） */
+  path: string
+  /** 简短描述（索引中提供，用于列表展示） */
+  description?: string
+  /** 角色定义（从 Markdown 文件解析后填充） */
+  roleDefinition?: string
+  /** 回复规则（从 Markdown 文件解析后填充） */
+  responseRules?: string
   /** 适用场景：common(通用)、group(仅群聊)、private(仅私聊) */
   chatType?: 'common' | 'group' | 'private'
 }
@@ -275,31 +281,88 @@ export const usePromptStore = defineStore(
     }
 
     /**
-     * 从远程获取预设列表（仅获取，不自动添加）
+     * 解析 Markdown 文件内容，使用 `---` 分隔 roleDefinition 和 responseRules
+     * @param content Markdown 文件内容
+     * @returns { roleDefinition, responseRules }
+     */
+    function parseMarkdownContent(content: string): { roleDefinition: string; responseRules: string } {
+      // 使用 `---` 独立成行作为分隔符
+      const separator = /\n---\n/
+      const parts = content.split(separator)
+
+      if (parts.length >= 2) {
+        return {
+          roleDefinition: parts[0].trim(),
+          responseRules: parts.slice(1).join('\n---\n').trim(),
+        }
+      }
+
+      // 如果没有分隔符，整个内容作为 roleDefinition
+      return {
+        roleDefinition: content.trim(),
+        responseRules: '',
+      }
+    }
+
+    /**
+     * 从远程获取预设索引列表（不下载 Markdown 内容，节省流量）
      * @param locale 当前语言设置 (如 'zh-CN', 'en-US')
-     * @returns 远程预设列表，获取失败返回空数组
+     * @returns 远程预设索引列表，获取失败返回空数组
      */
     async function fetchRemotePresets(locale: string): Promise<RemotePresetData[]> {
       const langPath = locale === 'zh-CN' ? 'cn' : 'en'
-      const url = `${REMOTE_PRESET_BASE_URL}/${langPath}/system-prompt.json`
+      const indexUrl = `${REMOTE_PRESET_BASE_URL}/${langPath}/system-prompt.json`
 
       try {
-        const result = await window.api.app.fetchRemoteConfig(url)
+        const result = await window.api.app.fetchRemoteConfig(indexUrl)
         if (!result.success || !result.data) {
           return []
         }
 
-        const remotePresets = result.data as RemotePresetData[]
-        if (!Array.isArray(remotePresets)) {
+        const presetIndex = result.data as RemotePresetData[]
+        if (!Array.isArray(presetIndex)) {
           return []
         }
 
-        // 过滤无效数据
-        return remotePresets.filter(
-          (preset) => preset.id && preset.name && preset.roleDefinition && preset.responseRules
-        )
+        // 过滤有效的索引项（必须有 id、name、path）
+        return presetIndex.filter((p) => p.id && p.name && p.path)
       } catch {
         return []
+      }
+    }
+
+    /**
+     * 按需下载单个预设的 Markdown 内容
+     * @param preset 预设索引数据
+     * @returns 包含完整内容的预设数据，失败返回 null
+     */
+    async function fetchPresetContent(
+      preset: RemotePresetData
+    ): Promise<(RemotePresetData & { roleDefinition: string; responseRules: string }) | null> {
+      // 如果已经有内容，直接返回
+      if (preset.roleDefinition && preset.responseRules) {
+        return preset as RemotePresetData & { roleDefinition: string; responseRules: string }
+      }
+
+      const mdUrl = `${REMOTE_PRESET_BASE_URL}${preset.path}`
+      try {
+        const mdResult = await window.api.app.fetchRemoteConfig(mdUrl)
+        if (!mdResult.success || typeof mdResult.data !== 'string') {
+          return null
+        }
+
+        const { roleDefinition, responseRules } = parseMarkdownContent(mdResult.data)
+        if (!roleDefinition || !responseRules) {
+          return null
+        }
+
+        return {
+          ...preset,
+          roleDefinition,
+          responseRules,
+        }
+      } catch {
+        return null
       }
     }
 
@@ -321,8 +384,8 @@ export const usePromptStore = defineStore(
       const newPreset: PromptPreset = {
         id: preset.id,
         name: preset.name,
-        roleDefinition: preset.roleDefinition,
-        responseRules: preset.responseRules,
+        roleDefinition: preset.roleDefinition || '',
+        responseRules: preset.responseRules || '',
         isBuiltIn: false,
         applicableTo,
         createdAt: now,
@@ -413,6 +476,7 @@ export const usePromptStore = defineStore(
       getActivePresetForChatType,
       getPresetsForChatType,
       fetchRemotePresets,
+      fetchPresetContent,
       addRemotePreset,
       isRemotePresetAdded,
     }

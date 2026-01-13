@@ -57,7 +57,7 @@ export function registerWindowHandlers(ctx: IpcContext): void {
   ipcMain.on('window:setThemeSource', (_, mode: 'system' | 'light' | 'dark') => {
     const { nativeTheme } = require('electron')
     nativeTheme.themeSource = mode
-    
+
     // Windows 上动态更新图标颜色以匹配主题
     if (process.platform === 'win32' && win) {
       const isDark = nativeTheme.shouldUseDarkColors
@@ -74,12 +74,23 @@ export function registerWindowHandlers(ctx: IpcContext): void {
     return app.getVersion()
   })
 
-  // 获取动态文案配置
+  // 获取远程配置（支持 JSON 和纯文本/Markdown）
   ipcMain.handle('app:fetchRemoteConfig', async (_, url: string) => {
     try {
       const response = await fetch(url)
-      const data = await response.json()
-      return { success: true, data }
+      const contentType = response.headers.get('content-type') || ''
+
+      // 根据 Content-Type 或 URL 后缀决定解析方式
+      const isJson = contentType.includes('application/json') || url.endsWith('.json')
+
+      if (isJson) {
+        const data = await response.json()
+        return { success: true, data }
+      } else {
+        // 纯文本/Markdown 等其他格式
+        const data = await response.text()
+        return { success: true, data }
+      }
     } catch (error) {
       return { success: false, error: String(error) }
     }
