@@ -48,8 +48,9 @@ export const feature: FormatFeature = {
   priority: 5, // 比单文件版本优先级更高
   extensions: ['.json'],
   signatures: {
-    head: [/"format"\s*:\s*"chunked-jsonl"/, /"chunked"\s*:/],
-    requiredFields: ['metadata', 'chatInfo', 'chunked'],
+    // 使用 head 签名 "format": "chunked-jsonl" 来区分。
+    head: [/"format"\s*:\s*"chunked-jsonl"/],
+    requiredFields: ['metadata', 'chatInfo'],
   },
 }
 
@@ -270,22 +271,49 @@ function readAvatars(baseDir: string, avatarsInfo?: { file: string; count: numbe
 }
 
 /**
- * 流式读取 JSONL 文件
+ * 流式读取 JSONL 文件（带详细错误处理）
  */
-async function* readJsonlFile(filePath: string): AsyncGenerator<ChunkedMessage> {
-  const fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' })
-  const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity,
-  })
+async function* readJsonlFile(
+  filePath: string,
+  onParseError?: (lineNumber: number, error: string) => void
+): AsyncGenerator<ChunkedMessage> {
+  let fileStream: fs.ReadStream | null = null
+  let rl: readline.Interface | null = null
+  let lineNumber = 0
+  let parseErrorCount = 0
+  const MAX_PARSE_ERRORS_TO_LOG = 10 // 最多记录前 10 个解析错误
 
-  for await (const line of rl) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    try {
-      yield JSON.parse(trimmed) as ChunkedMessage
-    } catch {
-      // 跳过无效的 JSON 行
+  try {
+    fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' })
+    rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    })
+
+    for await (const line of rl) {
+      lineNumber++
+      const trimmed = line.trim()
+      if (!trimmed) continue
+
+      try {
+        yield JSON.parse(trimmed) as ChunkedMessage
+      } catch (error) {
+        parseErrorCount++
+        // 只记录前几个解析错误，避免日志爆炸
+        if (parseErrorCount <= MAX_PARSE_ERRORS_TO_LOG && onParseError) {
+          const errorMsg = error instanceof Error ? error.message : String(error)
+          onParseError(lineNumber, errorMsg)
+        }
+        // 继续处理下一行
+      }
+    }
+  } finally {
+    // 确保资源被正确清理
+    if (rl) {
+      rl.close()
+    }
+    if (fileStream) {
+      fileStream.destroy()
     }
   }
 }
@@ -299,17 +327,24 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
   const manifestPath = filePath
   const baseDir = path.dirname(manifestPath)
 
+  onLog?.('info', `开始解析 manifest: ${manifestPath}`)
+  onLog?.('info', `基础目录: ${baseDir}`)
+
   // 读取 manifest
   let manifest: Manifest
   try {
     manifest = readManifest(manifestPath)
+    onLog?.('info', `manifest 读取成功`)
   } catch (error) {
-    yield { type: 'error', data: new Error(`无法读取 manifest.json: ${error}`) }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    onLog?.('error', `无法读取 manifest.json: ${errorMsg}`)
+    yield { type: 'error', data: new Error(`无法读取 manifest.json: ${errorMsg}`) }
     return
   }
 
   // 验证格式
   if (manifest.metadata.format !== 'chunked-jsonl') {
+    onLog?.('error', `不支持的格式: ${manifest.metadata.format}`)
     yield { type: 'error', data: new Error(`不支持的格式: ${manifest.metadata.format}`) }
     return
   }
@@ -318,6 +353,7 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
   let bytesRead = 0
   let messagesProcessed = 0
   let skippedMessages = 0
+  let parseErrors = 0
 
   // 发送初始进度
   const initialProgress = createProgress('parsing', 0, totalBytes, 0, '')
@@ -326,13 +362,19 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
 
   onLog?.(
     'info',
-    `开始解析 chunked-jsonl 格式 (V${manifest.metadata.version})，共 ${manifest.chunked.chunks.length} 个分块，预计 ${manifest.statistics.totalMessages} 条消息`
+    `开始解析 chunked-jsonl 格式 (V${manifest.metadata.version})，共 ${manifest.chunked.chunks.length} 个分块，预计 ${manifest.statistics.totalMessages} 条消息，总大小约 ${Math.round(totalBytes / 1024 / 1024)}MB`
   )
 
   // 读取头像文件（如果存在）
-  const avatarsMap = readAvatars(baseDir, manifest.avatars)
-  if (avatarsMap.size > 0) {
-    onLog?.('info', `已加载 ${avatarsMap.size} 个用户头像`)
+  let avatarsMap: Map<string, string>
+  try {
+    avatarsMap = readAvatars(baseDir, manifest.avatars)
+    if (avatarsMap.size > 0) {
+      onLog?.('info', `已加载 ${avatarsMap.size} 个用户头像`)
+    }
+  } catch (error) {
+    onLog?.('error', `读取头像文件失败: ${error instanceof Error ? error.message : String(error)}`)
+    avatarsMap = new Map()
   }
 
   // 发送 meta
@@ -344,13 +386,17 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
     ownerId: manifest.chatInfo.selfUin || manifest.chatInfo.selfUid,
   }
   yield { type: 'meta', data: meta }
+  onLog?.('info', `Meta 信息: name=${meta.name}, type=${meta.type}, ownerId=${meta.ownerId}`)
 
-  // 收集成员和消息
+  // 收集成员信息（不再收集所有消息到内存）
   const memberMap = new Map<string, MemberInfo>()
-  const messageBatch: ParsedMessage[] = []
+
+  // 当前消息批次（真正的流式处理：边读取边发送）
+  let currentBatch: ParsedMessage[] = []
 
   // 遍历所有 chunk 文件
-  for (const chunkInfo of manifest.chunked.chunks) {
+  for (let chunkIndex = 0; chunkIndex < manifest.chunked.chunks.length; chunkIndex++) {
+    const chunkInfo = manifest.chunked.chunks[chunkIndex]
     const relativePath = getChunkRelativePath(chunkInfo)
     const chunkPath = path.join(baseDir, relativePath)
     const chunkMessageCount = getChunkMessageCount(chunkInfo)
@@ -362,90 +408,122 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
 
     const chunkSize = fs.statSync(chunkPath).size
     let chunkMessagesRead = 0
+    let chunkParseErrors = 0
 
-    onLog?.('info', `正在解析分块: ${relativePath} (${chunkMessageCount} 条消息)`)
+    onLog?.(
+      'info',
+      `正在解析分块 [${chunkIndex + 1}/${manifest.chunked.chunks.length}]: ${relativePath} (预计 ${chunkMessageCount} 条消息, ${Math.round(chunkSize / 1024)}KB)`
+    )
 
-    // 流式读取 JSONL 文件
-    for await (const msg of readJsonlFile(chunkPath)) {
-      chunkMessagesRead++
-
-      // 获取 platformId
-      const platformId = msg.sender.uin || msg.sender.uid
-      if (!platformId || platformId === '0' || platformId === '未知') {
-        skippedMessages++
-        continue
+    // 流式读取 JSONL 文件（带错误处理）
+    try {
+      const parseErrorCallback = (lineNumber: number, errorMsg: string) => {
+        onLog?.('error', `分块 ${relativePath} 第 ${lineNumber} 行 JSON 解析失败: ${errorMsg}`)
       }
 
-      // 获取名字信息
-      // nickname: QQ 昵称（原始昵称）
-      // groupCard: 群昵称
-      // name: 展示名（一般是 groupCard || nickname）
-      const accountName = msg.sender.nickname || msg.sender.name || platformId
-      const groupNickname = msg.sender.groupCard || undefined
+      for await (const msg of readJsonlFile(chunkPath, parseErrorCallback)) {
+        chunkMessagesRead++
 
-      // 更新成员信息
-      const existingMember = memberMap.get(platformId)
-      if (!existingMember) {
-        memberMap.set(platformId, {
-          platformId,
-          accountName,
-          groupNickname,
-          avatar: avatarsMap.get(platformId),
+        // 获取 platformId
+        const platformId = msg.sender?.uin || msg.sender?.uid
+        if (!platformId || platformId === '0' || platformId === '未知') {
+          skippedMessages++
+          continue
+        }
+
+        // 获取名字信息
+        // nickname: QQ 昵称（原始昵称）
+        // groupCard: 群昵称
+        // name: 展示名（一般是 groupCard || nickname）
+        const accountName = msg.sender?.nickname || msg.sender?.name || platformId
+        const groupNickname = msg.sender?.groupCard || undefined
+
+        // 更新成员信息
+        const existingMember = memberMap.get(platformId)
+        if (!existingMember) {
+          memberMap.set(platformId, {
+            platformId,
+            accountName,
+            groupNickname,
+            avatar: avatarsMap.get(platformId),
+          })
+        } else {
+          existingMember.accountName = accountName
+          if (groupNickname) existingMember.groupNickname = groupNickname
+          if (!existingMember.avatar) existingMember.avatar = avatarsMap.get(platformId)
+        }
+
+        // 解析时间戳（chunked 格式的时间戳是毫秒）
+        const timestamp =
+          typeof msg.timestamp === 'number' ? Math.floor(msg.timestamp / 1000) : parseTimestamp(msg.timestamp)
+
+        if (timestamp === null || !isValidYear(timestamp)) {
+          skippedMessages++
+          continue
+        }
+
+        // 消息类型
+        const type = msg.system ? MessageType.SYSTEM : convertMessageType(msg.type, msg.content, msg.recalled)
+
+        // 文本内容
+        let textContent = msg.content?.text || ''
+        if (msg.recalled) textContent = '[已撤回] ' + textContent
+
+        // 添加到当前批次
+        currentBatch.push({
+          platformMessageId: msg.id,
+          senderPlatformId: platformId,
+          senderAccountName: accountName,
+          senderGroupNickname: groupNickname,
+          timestamp,
+          type,
+          content: textContent || null,
         })
-      } else {
-        existingMember.accountName = accountName
-        if (groupNickname) existingMember.groupNickname = groupNickname
-        if (!existingMember.avatar) existingMember.avatar = avatarsMap.get(platformId)
+
+        messagesProcessed++
+
+        // 达到批次大小时立即发送（真正的流式处理）
+        if (currentBatch.length >= batchSize) {
+          yield { type: 'messages', data: currentBatch }
+          currentBatch = [] // 清空批次，释放内存
+
+          // 发送进度
+          const chunkProgress = chunkMessageCount > 0 ? chunkMessagesRead / chunkMessageCount : 0
+          const chunkBytesRead = Math.floor(chunkProgress * chunkSize)
+          const currentBytesRead = bytesRead + chunkBytesRead
+          const progress = createProgress(
+            'parsing',
+            currentBytesRead,
+            totalBytes,
+            messagesProcessed,
+            `已处理 ${messagesProcessed} 条消息...`
+          )
+          yield { type: 'progress', data: progress }
+          onProgress?.(progress)
+        }
       }
-
-      // 解析时间戳（chunked 格式的时间戳是毫秒）
-      const timestamp =
-        typeof msg.timestamp === 'number' ? Math.floor(msg.timestamp / 1000) : parseTimestamp(msg.timestamp)
-
-      if (timestamp === null || !isValidYear(timestamp)) {
-        skippedMessages++
-        continue
-      }
-
-      // 消息类型
-      const type = msg.system ? MessageType.SYSTEM : convertMessageType(msg.type, msg.content, msg.recalled)
-
-      // 文本内容
-      let textContent = msg.content?.text || ''
-      if (msg.recalled) textContent = '[已撤回] ' + textContent
-
-      messageBatch.push({
-        platformMessageId: msg.id,
-        senderPlatformId: platformId,
-        senderAccountName: accountName,
-        senderGroupNickname: groupNickname,
-        timestamp,
-        type,
-        content: textContent || null,
-      })
-
-      messagesProcessed++
-
-      // 定期发送进度
-      if (messagesProcessed % batchSize === 0) {
-        // 估算字节读取进度
-        const chunkProgress = chunkMessageCount > 0 ? chunkMessagesRead / chunkMessageCount : 0
-        const chunkBytesRead = Math.floor(chunkProgress * chunkSize)
-        const currentBytesRead = bytesRead + chunkBytesRead
-        const progress = createProgress(
-          'parsing',
-          currentBytesRead,
-          totalBytes,
-          messagesProcessed,
-          `已处理 ${messagesProcessed} 条消息...`
-        )
-        yield { type: 'progress', data: progress }
-        onProgress?.(progress)
-      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      onLog?.('error', `解析分块 ${relativePath} 时发生错误: ${errorMsg}`)
+      chunkParseErrors++
+      parseErrors++
+      // 继续处理下一个分块，不中断整个解析
     }
 
     // 更新总字节读取
     bytesRead += chunkSize
+
+    // 记录分块处理结果
+    onLog?.(
+      'info',
+      `分块 ${relativePath} 解析完成: 读取 ${chunkMessagesRead} 条, 有效 ${messagesProcessed} 条, 跳过 ${skippedMessages} 条${chunkParseErrors > 0 ? `, 错误 ${chunkParseErrors} 个` : ''}`
+    )
+  }
+
+  // 发送剩余的消息批次
+  if (currentBatch.length > 0) {
+    yield { type: 'messages', data: currentBatch }
+    onLog?.('info', `发送最后一批消息: ${currentBatch.length} 条`)
   }
 
   // 发送成员（包含头像）
@@ -456,12 +534,7 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
     avatar: m.avatar,
   }))
   yield { type: 'members', data: members }
-
-  // 分批发送消息
-  for (let i = 0; i < messageBatch.length; i += batchSize) {
-    const batch = messageBatch.slice(i, i + batchSize)
-    yield { type: 'messages', data: batch }
-  }
+  onLog?.('info', `发送成员列表: ${members.length} 个成员`)
 
   // 完成
   const doneProgress = createProgress('done', totalBytes, totalBytes, messagesProcessed, '')
@@ -471,6 +544,9 @@ async function* parseChunkedJsonl(options: ParseOptions): AsyncGenerator<ParseEv
   onLog?.('info', `解析完成: ${messagesProcessed} 条消息, ${memberMap.size} 个成员`)
   if (skippedMessages > 0) {
     onLog?.('info', `跳过 ${skippedMessages} 条无效消息（缺少发送者ID或时间戳无效）`)
+  }
+  if (parseErrors > 0) {
+    onLog?.('error', `解析过程中发生 ${parseErrors} 个错误`)
   }
 
   yield {
