@@ -87,5 +87,20 @@
     "errorHint": "This is usually caused by corrupted database files. Please delete the failed sessions from the sidebar and re-import them.",
     "close": "Close",
     "retry": "Retry"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "subtitle": "View all version updates",
+    "viewChangelog": "Changelog",
+    "latest": "Latest",
+    "total": "{count} versions in total",
+    "close": "Close",
+    "loadError": "Failed to load changelog",
+    "retry": "Retry",
+    "types": {
+      "feat": "Features",
+      "fix": "Bug Fixes",
+      "chore": "Other"
+    }
   }
 }

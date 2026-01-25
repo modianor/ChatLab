@@ -87,5 +87,20 @@
     "errorHint": "这通常是因为数据库文件损坏。建议在侧边栏中删除失败的会话，然后重新导入。",
     "close": "关闭",
     "retry": "重试"
+  },
+  "changelog": {
+    "title": "版本日志",
+    "subtitle": "查看所有版本更新内容",
+    "viewChangelog": "版本日志",
+    "latest": "最新版本",
+    "total": "共 {count} 个版本",
+    "close": "关闭",
+    "loadError": "加载版本日志失败",
+    "retry": "重试",
+    "types": {
+      "feat": "新功能",
+      "fix": "问题修复",
+      "chore": "其他优化"
+    }
   }
 }

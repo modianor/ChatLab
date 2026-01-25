@@ -113,6 +113,13 @@ function handleAgree() {
 function handleDisagree() {
   window.api.send('window-close')
 }
+
+// 手动打开弹窗（供外部调用）
+function open() {
+  isOpen.value = true
+}
+
+defineExpose({ open })
 </script>
 
 <template>
