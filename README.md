@@ -2,94 +2,104 @@
 
 <img src="./public/images/chatlab.svg" alt="ChatLab" title="ChatLab" width="300" />
 
-本地化的聊天记录分析工具，通过 SQL 和 AI Agent 回顾你的社交记忆
+Local-first chat analysis tool: Relive your social memories powered by SQL and AI Agents.
 
-[English](README_en.md) | 简体中文
+English | [简体中文](./README.zh-CN.md)
 
-[项目主页](https://chatlab.fun/cn/) ·
-[项目文档](https://chatlab.fun/cn/usage/) ·
-[路线图](https://chatlabfun.featurebase.app/roadmap) ·
-[问题提交](https://github.com/hellodigua/ChatLab/issues)
+[Project Website](https://chatlab.fun/) ·
+[Documentation](https://chatlab.fun/usage/) ·
+[Roadmap](https://chatlabfun.featurebase.app/roadmap) ·
+[Issue Submission](https://github.com/hellodigua/ChatLab/issues)
 
 </div>
 
-ChatLab 是一个免费、开源、本地化的，专注于分析聊天记录的应用。通过 AI Agent 和灵活的 SQL 引擎，你可以自由地拆解、查询甚至重构你的社交数据。
+ChatLab is a free, open-source, and local-first application dedicated to analyzing chat records. Through an AI Agent and a flexible SQL engine, you can freely dissect, query, and even reconstruct your social data.
 
-目前已支持： WhatsApp、LINE、微信、QQ、Discord、Instagram 的聊天记录分析，即将支持： iMessage、Messenger、Kakao Talk。
+We refuse to upload your privacy to the cloud; instead, we bring powerful analytics directly to your computer.
 
-## 核心特性
+Currently supported: Chat record analysis for **LINE, WeChat, QQ, WhatsApp, Instagram and Discord**. Upcoming support: **Messenger, iMessage**.
 
-- 🚀 **极致性能**：使用流式计算与多线程并行架构，就算是百万条级别的聊天记录，依然拥有丝滑交互和响应。
-- 🔒 **保护隐私**：聊天记录和配置都存在你的本地数据库，所有分析都在本地进行（AI 功能例外）。
-- 🤖 **智能 AI Agent**：集成 10+ Function Calling 工具，支持动态调度，深度挖掘聊天记录中的更多有趣。
-- 📊 **多维数据可视化**：提供活跃度趋势、时间规律分布、成员排行等多个维度的直观分析图表。
-- 🧩 **格式标准化**：通过强大的数据抽象层，抹平不同聊天软件的格式差异，任何聊天记录都能分析。
+The project is still in early iteration, so there are many bugs and unfinished features. If you encounter any issues, feel free to provide feedback.
 
-## 使用指南
+## Core Features
 
-- [下载 ChatLab 指南](https://chatlab.fun/cn/?type=download)
-- [导出聊天记录指南](https://chatlab.fun/cn/usage/how-to-export.html)
-- [标准化格式规范](https://chatlab.fun/cn/usage/chatlab-format.html)
-- [故障排查指南](https://chatlab.fun/cn/usage/troubleshooting.html)
+- 🚀 **Ultimate Performance**: Utilizing stream computing and multi-threaded parallel architecture, it maintains fluid interaction and response even with millions of chat records.
+- 🔒 **Privacy Protection**: Chat records and configurations are stored in your local database, and all analysis is performed locally (with the exception of AI features).
+- 🤖 **Intelligent AI Agent**: Integrated with 10+ Function Calling tools and supporting dynamic scheduling to deeply excavate interesting insights from chat records.
+- 📊 **Multi-dimensional Data Visualization**: Provides intuitive analysis charts for activity trends, time distribution patterns, member rankings, and more.
+- 🧩 **Format Standardization**: Through a powerful data abstraction layer, it bridges the format differences between various chat applications, allowing any chat records to be analyzed.
 
-## 预览界面
+## Usage Guides
 
-预览更多请前往官网 [chatlab.fun](https://chatlab.fun/cn/)
+- [Chat Record Export Guide](https://chatlab.fun/usage/how-to-export.html)
+- [Standardized Format Specification](https://chatlab.fun/usage/chatlab-format.html)
+- [Troubleshooting Guide](https://chatlab.fun/usage/troubleshooting.html)
 
-![预览界面](/public/images/intro_zh.png)
+## Preview Interface
 
-## 系统架构
+For more previews, please visit the official website: [chatlab.fun](https://chatlab.fun/)
 
-### Electron 主进程
+![Preview Interface](/public/images/intro_en.png)
 
-- `electron/main/index.ts` 负责应用生命周期、窗口管理、自定义协议注册
-- `electron/main/ipc/` 按功能拆分 IPC 模块（窗口、聊天、合并、AI、缓存），确保数据交换安全可控
-- `electron/main/ai/` 集成多家 LLM，内置 Agent 管道、提示词拼装、Function Calling 工具注册
+## System Architecture
 
-### Worker 与数据管线
+### Electron Main Process
 
-- `electron/main/worker/` 中的 `workerManager` 统筹 Worker 线程，`dbWorker` 负责路由消息
-- `worker/query/*` 承担活跃度、AI 搜索、高级分析、SQL 实验室等查询；`worker/import/streamImport.ts` 提供流式导入
-- `parser/` 目录采用嗅探 + 解析三层架构，能在恒定内存下处理 GB 级日志文件
+- `electron/main/index.ts` handles the application lifecycle, window management, and custom protocol registration.
+- `electron/main/ipc/` splits IPC modules by function (Window, Chat, Merge, AI, Cache) to ensure secure and controllable data exchange.
+- `electron/main/ai/` integrates multiple LLMs, featuring built-in Agent pipelines, prompt assembly, and Function Calling tool registration.
 
-### 渲染进程
+### Worker and Data Pipeline
 
-- Vue 3 + Nuxt UI + Tailwind CSS 负责可视化页面。`src/pages` 存放各业务页面，`src/components/analysis`、`src/components/charts` 等目录提供复用组件
-- `src/stores` 通过 Pinia 管理会话、布局、AI 提示词等状态；`src/composables/useAIChat.ts` 封装 AI 对话流程
-- 预加载脚本 `electron/preload/index.ts` 暴露 `window.chatApi/mergeApi/aiApi/llmApi`，确保渲染进程与主进程通信安全隔离
+- The `workerManager` in `electron/main/worker/` coordinates Worker threads, while `dbWorker` handles message routing.
+- `worker/query/*` handles activity, AI search, advanced analysis, and SQL Lab queries.
+- `worker/import/streamImport.ts` provides stream importing.
+- The `parser/` directory adopts a three-layer "sniff + parse" architecture capable of processing GB-level log files with constant memory usage.
 
-## 本地运行
+### Rendering Process
 
-### 启动步骤
+- Vue 3 + Nuxt UI + Tailwind CSS manages the visualization pages.
+- `src/pages` contains business pages, while `src/components/analysis` and `src/components/charts` provide reusable components.
+- `src/stores` manages states like sessions, layout, and AI prompts via Pinia.
+- `src/composables/useAIChat.ts` encapsulates the AI conversation workflow.
+- The preload script `electron/preload/index.ts` exposes `window.chatApi/mergeApi/aiApi/llmApi`, ensuring secure isolation between the renderer and main processes.
 
-Node.js 环境依赖 v20+
+---
+
+## Local Development
+
+### Setup Steps
+
+Node.js environment requirement: v20+
 
 ```bash
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 启动开发服务器
+# Start development server
 pnpm run dev
+
 ```
 
-若 Electron 在启动时异常，可尝试使用 `electron-fix`：
+If Electron encounters exceptions during startup, you can try using `electron-fix`:
 
 ```bash
 npm install electron-fix -g
 electron-fix start
+
 ```
 
-## 贡献指南
+## Contribution Guide
 
-提交 Pull Request 前请遵循以下原则：
+Please follow these principles before submitting a Pull Request:
 
-- 明显的 Bug 修复可直接提交
-- 对于新功能，请先提交 Issue 进行讨论，**未经讨论直接提交的 PR 会被关闭**
-- 一个 PR 尽量只做一件事，若改动较大，请考虑拆分为多个独立的 PR
+- Obvious bug fixes can be submitted directly.
+- For new features, please submit an Issue for discussion first; **PRs submitted without prior discussion will be closed**.
+- Keep one PR focused on one task; if changes are extensive, consider splitting them into multiple independent PRs.
 
-## 隐私政策与用户协议
+## Privacy Policy & User Agreement
 
-使用本软件前，请阅读 [隐私政策与用户协议](./src/assets/docs/agreement_zh.md)
+Before using this software, please read the [Privacy Policy & User Agreement](./src/assets/docs/agreement_en.md).
 
 ## License
 
