@@ -1,5 +1,30 @@
 [
   {
+    "version": "0.9.4",
+    "date": "2026-02-08",
+    "summary": "Improved time filtering and AI configuration UX, added local API key encryption, and fixed LINE chat log parsing.",
+    "changes": [
+      {
+        "type": "feat",
+        "items": [
+          "Add more flexible time-filtering options.",
+          "Store API keys with local encryption.",
+          "Hide release notes for first-time users.",
+          "Improve the configuration status display in the AI chat footer.",
+          "Allow the app to restart immediately after data directory migration."
+        ]
+      },
+      {
+        "type": "fix",
+        "items": ["Fix parsing issues for LINE chat logs."]
+      },
+      {
+        "type": "docs",
+        "items": ["Update project documentation."]
+      }
+    ]
+  },
+  {
     "version": "0.9.3",
     "date": "2026-02-03",
     "summary": "Support custom data directories and fix many known issues.",
