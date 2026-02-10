@@ -73,6 +73,7 @@ export {
   getSessionStats,
   updateSessionGapThreshold,
   getSessions,
+  generateIncrementalSessions,
   saveSessionSummary,
   getSessionSummary,
   searchSessions,

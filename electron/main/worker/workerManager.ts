@@ -575,6 +575,13 @@ export async function generateSessions(sessionId: string, gapThreshold?: number)
 }
 
 /**
+ * 增量生成会话索引（仅处理未索引的新消息，保留已有会话和摘要）
+ */
+export async function generateIncrementalSessions(sessionId: string, gapThreshold?: number): Promise<number> {
+  return sendToWorker('generateIncrementalSessions', { sessionId, gapThreshold })
+}
+
+/**
  * 清空会话索引
  */
 export async function clearSessions(sessionId: string): Promise<void> {

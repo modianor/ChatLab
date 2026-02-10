@@ -155,6 +155,135 @@ export function generateSessions(
 }
 
 /**
+ * 增量生成会话索引
+ * 仅处理现有最后一个会话 end_ts 之后的新消息，保留已有会话和摘要不变。
+ *
+ * @param sessionId 数据库会话ID
+ * @param gapThreshold 时间间隔阈值（秒），默认 1800（30分钟）
+ * @returns 新增的会话数量
+ */
+export function generateIncrementalSessions(
+  sessionId: string,
+  gapThreshold: number = DEFAULT_SESSION_GAP_THRESHOLD,
+): number {
+  // 先关闭缓存的只读连接
+  closeDatabase(sessionId)
+
+  const db = openWritableDatabase(sessionId)
+  if (!db) {
+    throw new Error(`无法打开数据库: ${sessionId}`)
+  }
+
+  try {
+    // 1. 获取已索引消息的 ID 集合（通过 message_context 表）
+    const indexedIds = new Set<number>()
+    const existingContextRows = db.prepare('SELECT message_id FROM message_context').all() as Array<{ message_id: number }>
+    for (const row of existingContextRows) {
+      indexedIds.add(row.message_id)
+    }
+
+    // 2. 找出所有未被索引的消息
+    const allMessages = db.prepare('SELECT id, ts FROM message ORDER BY ts, id').all() as Array<{
+      id: number
+      ts: number
+    }>
+
+    const newMessages = allMessages.filter((m) => !indexedIds.has(m.id))
+
+    if (newMessages.length === 0) {
+      return 0
+    }
+
+    // 3. 获取最后一个已有会话的信息
+    const lastSession = db.prepare(
+      'SELECT id, end_ts FROM chat_session ORDER BY end_ts DESC LIMIT 1'
+    ).get() as { id: number; end_ts: number } | undefined
+
+    // 4. 按时间排序新消息，然后用 gap-based 算法切分
+    newMessages.sort((a, b) => a.ts - b.ts || a.id - b.id)
+
+    const insertSession = db.prepare(`
+      INSERT INTO chat_session (start_ts, end_ts, message_count, is_manual, summary)
+      VALUES (?, ?, ?, 0, NULL)
+    `)
+
+    const insertContext = db.prepare(`
+      INSERT INTO message_context (message_id, session_id, topic_id)
+      VALUES (?, ?, NULL)
+    `)
+
+    const updateSessionEndAndCount = db.prepare(`
+      UPDATE chat_session SET end_ts = ?, message_count = message_count + ? WHERE id = ?
+    `)
+
+    const transaction = db.transaction(() => {
+      let newSessionCount = 0
+      let currentSessionId: number | null = null
+      let currentEndTs: number = 0
+      let appendCount = 0
+
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i]
+        const isFirst = i === 0
+
+        // 判断是否需要新建会话
+        let needNewSession = false
+
+        if (isFirst) {
+          // 第一条新消息：检查是否能并入最后一个已有会话
+          if (lastSession && (msg.ts - lastSession.end_ts) <= gapThreshold * 1000) {
+            // 并入已有会话
+            currentSessionId = lastSession.id
+            currentEndTs = lastSession.end_ts
+            appendCount = 0
+          } else {
+            needNewSession = true
+          }
+        } else {
+          // 后续消息：检查与上一条的时间差
+          const prevMsg = newMessages[i - 1]
+          if ((msg.ts - prevMsg.ts) > gapThreshold * 1000) {
+            // 如果之前在追加已有会话，先更新它
+            if (currentSessionId && appendCount > 0) {
+              updateSessionEndAndCount.run(currentEndTs, appendCount, currentSessionId)
+              appendCount = 0
+            }
+            needNewSession = true
+          }
+        }
+
+        if (needNewSession) {
+          // 新建会话
+          const result = insertSession.run(msg.ts, msg.ts, 1)
+          currentSessionId = result.lastInsertRowid as number
+          currentEndTs = msg.ts
+          newSessionCount++
+          appendCount = 0
+        } else {
+          // 追加到当前会话
+          currentEndTs = msg.ts
+          appendCount++
+        }
+
+        // 插入消息上下文
+        insertContext.run(msg.id, currentSessionId)
+      }
+
+      // 处理最后一个追加中的会话
+      if (currentSessionId && appendCount > 0) {
+        updateSessionEndAndCount.run(currentEndTs, appendCount, currentSessionId)
+      }
+
+      return newSessionCount
+    })
+
+    return transaction()
+  } finally {
+    db.close()
+  }
+}
+
+/**
  * 清空会话索引数据
  * @param sessionId 数据库会话ID
  */

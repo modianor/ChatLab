@@ -1007,11 +1007,11 @@ export function registerChatHandlers(ctx: IpcContext): void {
       })
 
       if (result.success) {
-        // 重新生成会话索引
+        // 增量生成会话索引（仅处理新增消息，保留已有会话和摘要）
         try {
-          await worker.generateSessions(sessionId)
+          await worker.generateIncrementalSessions(sessionId)
         } catch (e) {
-          console.error('[IpcMain] 重新生成会话索引失败:', e)
+          console.error('[IpcMain] 增量生成会话索引失败:', e)
         }
       }
 

@@ -53,6 +53,7 @@ import {
   getSchema,
   // 会话索引
   generateSessions,
+  generateIncrementalSessions,
   clearSessions,
   hasSessionIndex,
   getSessionStats,
@@ -143,6 +144,7 @@ const syncHandlers: Record<string, (payload: any) => any> = {
 
   // 会话索引
   generateSessions: (p) => generateSessions(p.sessionId, p.gapThreshold),
+  generateIncrementalSessions: (p) => generateIncrementalSessions(p.sessionId, p.gapThreshold),
   clearSessions: (p) => clearSessions(p.sessionId),
   hasSessionIndex: (p) => hasSessionIndex(p.sessionId),
   getSessionStats: (p) => getSessionStats(p.sessionId),

@@ -22,6 +22,7 @@ export { DEFAULT_SESSION_GAP_THRESHOLD } from './types'
 // 会话索引管理
 export {
   generateSessions,
+  generateIncrementalSessions,
   clearSessions,
   hasSessionIndex,
   getSessionStats,
